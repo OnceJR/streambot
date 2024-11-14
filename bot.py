@@ -113,19 +113,14 @@ async def send_welcome_message():
 
 # Función principal para iniciar el cliente y enviar el mensaje de bienvenida
 async def main():
-    # Inicia el cliente
     await client.start()
+    
+    # Usa directamente el `chat_id` en lugar del enlace de invitación
+    chat_id = -1733577914  # Reemplaza este número con el `chat_id` real del canal
 
-    # Ingresa el enlace del canal
-    invite_link = "https://t.me/+ryhIONLG8OJkZDQ5"
+    # Envía un mensaje de bienvenida al canal
+    await client.send_message(chat_id, "Bienvenido al canal. El bot está activo.")
     
-    # Únete al canal usando el enlace de invitación
-    chat = await client.join_chat(invite_link)
-    
-    # Muestra el `chat_id`
-    print(f"El chat_id del canal es: {chat.id}")
-    
-    # Detén el cliente
     await client.stop()
 
 # Ejecuta `main`
