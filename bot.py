@@ -2,7 +2,7 @@ import os
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pytgcalls import PyTgCalls
-from pytgcalls.types import InputAudioStream
+from pytgcalls.stream import AudioPiped
 from config import Config
 import ffmpeg
 
@@ -29,7 +29,7 @@ def get_control_buttons():
 async def play_audio(chat_id, url):
     try:
         process = ffmpeg.input(url).output("pipe:1", format="opus", acodec="libopus").run_async(pipe_stdout=True)
-        await pytgcalls.join_group_call(chat_id, InputAudioStream(process.stdout))
+        await pytgcalls.join_group_call(chat_id, AudioPiped(process.stdout))
         return "Reproduciendo audio."
     except Exception as e:
         return f"Error al reproducir audio: {e}"
