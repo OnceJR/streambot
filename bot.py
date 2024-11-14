@@ -1,7 +1,7 @@
 import os
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from pytgcalls import PyTgCalls
+from py_tgcalls import PyTgCalls
 from pytgcalls.types.input_stream import InputAudioStream
 from config import Config
 import ffmpeg
