@@ -41,7 +41,7 @@ async def play(_, message):
         await message.reply_text("Por favor, proporciona un enlace o archivo de audio.")
         return
     url = message.command[1]
-    chat_id = Config.CHAT_ID
+    chat_id = Config.CHAT_IDS[0]  # Usa el primer chat por defecto
     queue.append(url)  # Agrega el URL a la cola
     if len(queue) == 1:  # Si es el primer elemento en la cola, inicia la reproducción
         msg = await play_audio(chat_id, url)
@@ -55,7 +55,7 @@ async def skip(_, message):
     if len(queue) > 1:
         queue.pop(0)  # Elimina el elemento actual de la cola
         next_url = queue[0]
-        msg = await play_audio(Config.CHAT_ID, next_url)
+        msg = await play_audio(Config.CHAT_IDS[0], next_url)
         await message.reply_text(msg, reply_markup=get_control_buttons())
     else:
         await message.reply_text("No hay más elementos en la cola.", reply_markup=get_control_buttons())
@@ -63,7 +63,7 @@ async def skip(_, message):
 # Comando /stop para detener la reproducción
 @client.on_message(filters.command("stop"))
 async def stop(_, message):
-    await pytgcalls.leave_group_call(Config.CHAT_ID)
+    await pytgcalls.leave_group_call(Config.CHAT_IDS[0])
     queue.clear()  # Vacía la cola
     await message.reply_text("Reproducción detenida y cola vaciada.", reply_markup=get_control_buttons())
 
@@ -72,20 +72,20 @@ async def stop(_, message):
 async def callback_handler(client, callback_query):
     data = callback_query.data
     if data == "pause":
-        await pytgcalls.pause_stream(Config.CHAT_ID)
+        await pytgcalls.pause_stream(Config.CHAT_IDS[0])
         await callback_query.answer("Reproducción pausada.")
     elif data == "resume":
-        await pytgcalls.resume_stream(Config.CHAT_ID)
+        await pytgcalls.resume_stream(Config.CHAT_IDS[0])
         await callback_query.answer("Reproducción reanudada.")
     elif data == "stop":
-        await pytgcalls.leave_group_call(Config.CHAT_ID)
+        await pytgcalls.leave_group_call(Config.CHAT_IDS[0])
         queue.clear()
         await callback_query.answer("Reproducción detenida.")
     elif data == "skip":
         if len(queue) > 1:
             queue.pop(0)
             next_url = queue[0]
-            msg = await play_audio(Config.CHAT_ID, next_url)
+            msg = await play_audio(Config.CHAT_IDS[0], next_url)
             await callback_query.message.reply_text(msg, reply_markup=get_control_buttons())
             await callback_query.answer("Siguiente en la cola.")
         else:
@@ -105,14 +105,25 @@ Usa los siguientes comandos para interactuar conmigo:
 ¡Espero que disfrutes de la música! 🎶
 """
 
+async def get_chat_ids():
+    resolved_chat_ids = []
+    for chat in Config.CHAT_IDS:
+        if isinstance(chat, str) and chat.startswith("@"):
+            resolved_chat = await client.get_chat(chat)
+            resolved_chat_ids.append(resolved_chat.id)
+        else:
+            resolved_chat_ids.append(chat)
+    return resolved_chat_ids
+
 async def send_welcome_message():
-    # Envía el mensaje de bienvenida al chat configurado en Config
-    chat_id = Config.CHAT_ID
-    await client.send_message(chat_id, WELCOME_MESSAGE)
+    # Envía el mensaje de bienvenida a todos los chats configurados
+    for chat_id in Config.CHAT_IDS:
+        await client.send_message(chat_id, WELCOME_MESSAGE)
 
 # Función principal para iniciar el cliente y enviar el mensaje de bienvenida
 async def main():
     await client.start()
+    Config.CHAT_IDS = await get_chat_ids()  # Resuelve los nombres de usuario a chat_id numéricos
     await pytgcalls.start()
     await send_welcome_message()
     await idle()  # Mantiene el bot en ejecución
