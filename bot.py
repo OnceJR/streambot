@@ -2,24 +2,26 @@ import os
 from pyrogram import Client, idle, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pytgcalls import PyTgCalls
-from pytgcalls.types.input_stream import AudioVideoPiped, AudioPiped
+from pytgcalls.types.input_stream import AudioVideoPiped
 from config import Config
 import ffmpeg
 
 # Configura el cliente de Pyrogram y PyTgCalls
-client = Client("vcplayerbot", api_id=Config.API_ID, api_hash=Config.API_HASH, bot_token=Config.BOT_TOKEN)
+client = Client("my_bot", api_id=Config.API_ID, api_hash=Config.API_HASH, bot_token=Config.BOT_TOKEN)
 pytgcalls = PyTgCalls(client)
-
-# Cola de reproducción
-queue = []
+queue = []  # Cola de reproducción
 
 # Función para mostrar botones de control
 def get_control_buttons():
     buttons = [
-        [InlineKeyboardButton("⏸ Pausa", callback_data="pause"),
-         InlineKeyboardButton("▶️ Reanudar", callback_data="resume")],
-        [InlineKeyboardButton("⏹ Detener", callback_data="stop"),
-         InlineKeyboardButton("⏭ Siguiente", callback_data="skip")]
+        [
+            InlineKeyboardButton("⏸ Pause", callback_data="pause"),
+            InlineKeyboardButton("▶️ Resume", callback_data="resume"),
+        ],
+        [
+            InlineKeyboardButton("⏹ Stop", callback_data="stop"),
+            InlineKeyboardButton("⏭ Skip", callback_data="skip"),
+        ]
     ]
     return InlineKeyboardMarkup(buttons)
 
@@ -27,9 +29,8 @@ def get_control_buttons():
 async def play_video(chat_id, url):
     try:
         process = (
-            ffmpeg
-            .input(url)
-            .output("pipe:1", format="matroska", vcodec="libx264", acodec="aac", pix_fmt="yuv420p")
+            ffmpeg.input(url)
+            .output("pipe:1", format="mpegts", vcodec="libx264", acodec="aac", strict="experimental")
             .run_async(pipe_stdout=True)
         )
         await pytgcalls.join_group_call(chat_id, AudioVideoPiped(process.stdout))
@@ -37,16 +38,16 @@ async def play_video(chat_id, url):
     except Exception as e:
         return f"Error al reproducir video: {e}"
 
-# Comando /play para iniciar la reproducción de video
+# Comando /play para iniciar la reproducción
 @client.on_message(filters.command("play"))
 async def play(_, message):
     if len(message.command) < 2:
         await message.reply_text("Por favor, proporciona un enlace o archivo de video.")
         return
     url = message.command[1]
-    chat_id = Config.CHAT_IDS[0]
-    queue.append(url)
-    if len(queue) == 1:
+    chat_id = Config.CHAT_IDS[0]  # Usa el primer chat por defecto
+    queue.append(url)  # Agrega el URL a la cola
+    if len(queue) == 1:  # Si es el primer elemento en la cola, inicia la reproducción
         msg = await play_video(chat_id, url)
         await message.reply_text(msg, reply_markup=get_control_buttons())
     else:
@@ -56,6 +57,7 @@ async def play(_, message):
 async def main():
     await client.start()
     await pytgcalls.start()
-    await idle()
+    await idle()  # Mantiene el bot en ejecución
 
+# Ejecuta el bot
 client.run(main())
