@@ -122,4 +122,6 @@ async def main():
     # Muestra el `chat_id`
     print(f"El chat_id del canal es: {chat.id}")
 
-client.run(main())
+# Corre el cliente y ejecuta `main`
+async with client:
+    await main()
