@@ -115,13 +115,7 @@ async def send_welcome_message():
 async def main():
     await client.start()
     
-    # Usa directamente el `chat_id` en lugar del enlace de invitación
-    chat_id = -1733577914  # Reemplaza este número con el `chat_id` real del canal
+    async for dialog in client.get_dialogs():
+        print(dialog.chat.title, dialog.chat.id)  # Esto imprime el `chat_id` de los chats del bot
 
-    # Envía un mensaje de bienvenida al canal
-    await client.send_message(chat_id, "Bienvenido al canal. El bot está activo.")
-    
     await client.stop()
-
-# Ejecuta `main`
-client.run(main())
