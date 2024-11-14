@@ -113,10 +113,13 @@ async def send_welcome_message():
 
 # Función principal para iniciar el cliente y enviar el mensaje de bienvenida
 async def main():
-    await client.start()
-    await pytgcalls.start()
-    print("Bot iniciado y listo para reproducir.")
-    await send_welcome_message()  # Envía el mensaje de bienvenida al inicio
-    await idle()  # Mantiene el cliente activo
+    # Ingresa el enlace del canal
+    invite_link = "https://t.me/+ryhIONLG8OJkZDQ5"
+    
+    # Únete al canal usando el enlace de invitación
+    chat = await client.join_chat(invite_link)
+    
+    # Muestra el `chat_id`
+    print(f"El chat_id del canal es: {chat.id}")
 
 client.run(main())
