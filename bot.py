@@ -1,6 +1,7 @@
 import os
 from pyrogram import Client, idle, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.types import Message
 from pytgcalls import PyTgCalls
 from pytgcalls.types.input_stream import AudioPiped
 from config import Config
@@ -91,10 +92,31 @@ async def callback_handler(client, callback_query):
         else:
             await callback_query.answer("No hay más elementos en la cola.")
 
+# Mensaje de bienvenida
+WELCOME_MESSAGE = """
+🎉 ¡Bienvenido al bot de streaming de audio! 🎉
+
+Usa los siguientes comandos para interactuar conmigo:
+- **/play <URL>** - Para reproducir audio desde un enlace.
+- **/pause** - Para pausar la reproducción.
+- **/resume** - Para reanudar la reproducción.
+- **/stop** - Para detener la reproducción y limpiar la cola.
+- **/skip** - Para saltar al siguiente en la cola.
+
+¡Espero que disfrutes de la música! 🎶
+"""
+
+async def send_welcome_message():
+    # Envía el mensaje de bienvenida al chat configurado en Config
+    chat_id = Config.CHAT_ID
+    await client.send_message(chat_id, WELCOME_MESSAGE)
+
+# Función principal para iniciar el cliente y enviar el mensaje de bienvenida
 async def main():
     await client.start()
     await pytgcalls.start()
     print("Bot iniciado y listo para reproducir.")
-    await idle()  # Mantener el cliente activo
+    await send_welcome_message()  # Envía el mensaje de bienvenida al inicio
+    await idle()  # Mantiene el cliente activo
 
 client.run(main())
