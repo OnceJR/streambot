@@ -5,6 +5,7 @@ from pytgcalls import PyTgCalls
 from pytgcalls.types.input_stream import AudioVideoPiped
 from config import Config
 import ffmpeg
+from yt_dlp import YoutubeDL
 
 # Configura el cliente de Pyrogram y PyTgCalls
 client = Client("my_bot", api_id=Config.API_ID, api_hash=Config.API_HASH, bot_token=Config.BOT_TOKEN)
@@ -25,9 +26,24 @@ def get_control_buttons():
     ]
     return InlineKeyboardMarkup(buttons)
 
+# Función para extraer el enlace de transmisión directa de YouTube
+def get_direct_url(youtube_url):
+    ydl_opts = {
+        "format": "best[ext=mp4][height<=480]",
+        "quiet": True,
+        "no_warnings": True,
+    }
+    with YoutubeDL(ydl_opts) as ydl:
+        info_dict = ydl.extract_info(youtube_url, download=False)
+        return info_dict.get("url")
+
 # Función para reproducir video
 async def play_video(chat_id, url):
     try:
+        # Extrae el enlace de transmisión directa si es un enlace de YouTube
+        if "youtube.com" in url or "youtu.be" in url:
+            url = get_direct_url(url)
+        
         process = (
             ffmpeg.input(url)
             .output("pipe:1", format="mpegts", vcodec="libx264", acodec="aac", strict="experimental")
