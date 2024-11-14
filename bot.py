@@ -1,7 +1,6 @@
 import os
 from pyrogram import Client, idle, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from pyrogram.types import Message
 from pytgcalls import PyTgCalls
 from pytgcalls.types.input_stream import AudioPiped
 from config import Config
@@ -114,8 +113,9 @@ async def send_welcome_message():
 # Función principal para iniciar el cliente y enviar el mensaje de bienvenida
 async def main():
     await client.start()
-    
-    async for dialog in client.get_dialogs():
-        print(dialog.chat.title, dialog.chat.id)  # Esto imprime el `chat_id` de los chats del bot
+    await pytgcalls.start()
+    await send_welcome_message()
+    await idle()  # Mantiene el bot en ejecución
 
-    await client.stop()
+# Ejecuta el bot
+client.run(main())
