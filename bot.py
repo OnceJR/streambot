@@ -1,5 +1,5 @@
 import os
-from pyrogram import Client, filters
+from pyrogram import Client, idle, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pytgcalls import PyTgCalls
 from pytgcalls.types.input_stream import AudioPiped
@@ -91,11 +91,10 @@ async def callback_handler(client, callback_query):
         else:
             await callback_query.answer("No hay más elementos en la cola.")
 
-# Iniciar el cliente y PyTgCalls
 async def main():
     await client.start()
     await pytgcalls.start()
     print("Bot iniciado y listo para reproducir.")
-    await client.idle()
+    await idle()  # Mantener el cliente activo
 
 client.run(main())
