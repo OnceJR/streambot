@@ -1,4 +1,5 @@
 import os
+import subprocess
 from pyrogram import Client, idle, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pytgcalls import PyTgCalls
@@ -29,10 +30,19 @@ def get_control_buttons():
 async def play_media(chat_id, url, is_video):
     try:
         if is_video:
-            process = ffmpeg.input(url).output("pipe:1", format="mpegts").run_async(pipe_stdout=True, pipe_stderr=True)
+            # Cambia a una invocación que controla tanto stdout como stderr
+            process = subprocess.Popen(
+                ['ffmpeg', '-i', url, '-f', 'mpegts', 'pipe:1'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
             await pytgcalls.join_group_call(chat_id, AudioVideoPiped(process.stdout))
         else:
-            process = ffmpeg.input(url).output("pipe:1", format="opus", acodec="libopus").run_async(pipe_stdout=True, pipe_stderr=True)
+            process = subprocess.Popen(
+                ['ffmpeg', '-i', url, '-f', 'opus', '-acodec', 'libopus', 'pipe:1'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
             await pytgcalls.join_group_call(chat_id, AudioPiped(process.stdout))
         return "Reproduciendo media."
     except Exception as e:
