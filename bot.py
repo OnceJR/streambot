@@ -10,7 +10,6 @@ import logging
 # Configura el cliente de Pyrogram y PyTgCalls
 client = Client("my_bot", api_id=Config.API_ID, api_hash=Config.API_HASH, bot_token=Config.BOT_TOKEN)
 pytgcalls = PyTgCalls(client)
-queue = []  # Cola de reproducción
 
 # Configuración de logs
 logging.basicConfig(level=logging.INFO)
@@ -34,10 +33,11 @@ def get_control_buttons():
 async def play_video(chat_id, url):
     try:
         logger.info(f"Iniciando reproducción para URL: {url}")
+        # Ejecutar ffmpeg como subproceso
         process = subprocess.Popen(
             [
                 "ffmpeg",
-                "-i", url,
+                "-re", "-i", url,
                 "-f", "mpegts",
                 "-codec:v", "mpeg2video",
                 "-codec:a", "mp2",
@@ -45,8 +45,10 @@ async def play_video(chat_id, url):
                 "pipe:1"
             ],
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            stderr=subprocess.PIPE,
+            bufsize=10**8  # Ajustar tamaño del buffer
         )
+        # Pasar el flujo de salida a PyTgCalls
         await pytgcalls.join_group_call(chat_id, AudioVideoPiped(process.stdout))
         return "Reproduciendo video."
     except Exception as e:
@@ -61,18 +63,13 @@ async def play(_, message):
         return
     url = message.command[1]
     chat_id = Config.CHAT_IDS[0]  # Usa el primer chat por defecto
-    queue.append(url)  # Agrega el URL a la cola
-    if len(queue) == 1:  # Si es el primer elemento en la cola, inicia la reproducción
-        msg = await play_video(chat_id, url)
-        await message.reply_text(msg, reply_markup=get_control_buttons())
-    else:
-        await message.reply_text("Añadido a la cola de reproducción.", reply_markup=get_control_buttons())
+    msg = await play_video(chat_id, url)
+    await message.reply_text(msg, reply_markup=get_control_buttons())
 
 # Comando /stop para detener la reproducción
 @client.on_message(filters.command("stop"))
 async def stop(_, message):
     await pytgcalls.leave_group_call(Config.CHAT_IDS[0])
-    queue.clear()  # Vacía la cola
     await message.reply_text("Reproducción detenida y cola vaciada.", reply_markup=get_control_buttons())
 
 # Manejo de los botones de control
@@ -87,7 +84,6 @@ async def callback_handler(client, callback_query):
         await callback_query.answer("Reproducción reanudada.")
     elif data == "stop":
         await pytgcalls.leave_group_call(Config.CHAT_IDS[0])
-        queue.clear()
         await callback_query.answer("Reproducción detenida.")
 
 # Mensaje de bienvenida
