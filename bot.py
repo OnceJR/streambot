@@ -46,6 +46,8 @@ async def play_media(chat_id, url, is_video):
             await pytgcalls.join_group_call(chat_id, AudioPiped(process.stdout))
         return "Reproduciendo media."
     except Exception as e:
+        error_output = process.stderr.read().decode('utf-8')
+        print("ffmpeg stderr output:", error_output)
         return f"Error al reproducir: {e}"
 
 # Comando /play para iniciar la reproducción
