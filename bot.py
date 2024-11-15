@@ -54,6 +54,24 @@ async def play(_, message):
     else:
         await message.reply_text("Añadido a la cola de reproducción.", reply_markup=get_control_buttons())
 
+# Comando para recibir archivos directamente y reproducirlos
+@client.on_message(filters.video | filters.audio)
+async def receive_file(_, message):
+    file_id = message.video.file_id if message.video else message.audio.file_id
+    file_name = message.video.file_name if message.video else message.audio.file_name
+    file_path = await client.download_media(file_id)
+    is_video = bool(message.video)
+    chat_id = Config.CHAT_IDS[0]  # Usa el primer chat por defecto
+
+    # Agrega el archivo a la cola y confirma su recepción
+    queue.append((file_path, is_video))
+    await message.reply_text(f"Archivo '{file_name}' recibido y añadido a la cola.")
+
+    # Reproduce si es el primer elemento en la cola
+    if len(queue) == 1:
+        msg = await play_media(chat_id, file_path, is_video)
+        await message.reply_text(msg, reply_markup=get_control_buttons())
+
 # Comando /skip para saltar al siguiente en la cola
 @client.on_message(filters.command("skip"))
 async def skip(_, message):
