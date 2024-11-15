@@ -4,7 +4,7 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pytgcalls import PyTgCalls
 from pytgcalls.types.input_stream import AudioVideoPiped
 from config import Config
-import ffmpeg
+import subprocess
 import logging
 
 # Configura el cliente de Pyrogram y PyTgCalls
@@ -34,11 +34,18 @@ def get_control_buttons():
 async def play_video(chat_id, url):
     try:
         logger.info(f"Iniciando reproducción para URL: {url}")
-        process = (
-            ffmpeg
-            .input(url)
-            .output("pipe:1", format="mpegts", vcodec="mpeg2video", acodec="mp2", r=30)
-            .run_async(pipe_stdout=True)
+        process = subprocess.Popen(
+            [
+                "ffmpeg",
+                "-i", url,
+                "-f", "mpegts",
+                "-codec:v", "mpeg2video",
+                "-codec:a", "mp2",
+                "-r", "30",
+                "pipe:1"
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
         )
         await pytgcalls.join_group_call(chat_id, AudioVideoPiped(process.stdout))
         return "Reproduciendo video."
