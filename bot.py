@@ -29,10 +29,10 @@ def get_control_buttons():
 async def play_media(chat_id, url, is_video):
     try:
         if is_video:
-            process = ffmpeg.input(url).output("pipe:1", format="mpegts").run_async(pipe_stdout=True)
+            process = ffmpeg.input(url).output("pipe:1", format="mpegts").run_async(pipe_stdout=True, pipe_stderr=True)
             await pytgcalls.join_group_call(chat_id, AudioVideoPiped(process.stdout))
         else:
-            process = ffmpeg.input(url).output("pipe:1", format="opus", acodec="libopus").run_async(pipe_stdout=True)
+            process = ffmpeg.input(url).output("pipe:1", format="opus", acodec="libopus").run_async(pipe_stdout=True, pipe_stderr=True)
             await pytgcalls.join_group_call(chat_id, AudioPiped(process.stdout))
         return "Reproduciendo media."
     except Exception as e:
