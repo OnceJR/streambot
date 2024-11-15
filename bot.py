@@ -30,7 +30,7 @@ def get_control_buttons():
 async def play_media(chat_id, url, is_video):
     try:
         if is_video:
-            # Cambia a una invocación que controla tanto stdout como stderr
+            # ffmpeg se usa para leer y transmitir video sin descarga previa
             process = subprocess.Popen(
                 ['ffmpeg', '-i', url, '-f', 'mpegts', 'pipe:1'],
                 stdout=subprocess.PIPE,
