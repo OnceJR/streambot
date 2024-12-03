@@ -12,8 +12,8 @@ API_HASH = '6a1c48cfe81b1fc932a02c4cc1d312bf'
 BOT_TOKEN = '8100674706:AAGzf_JziSNHdJCHHTT4Z9cSWLvF03zF_yU'
 
 # Límites y rutas
-DOWNLOAD_PATH = "/path/to/downloads/"
-COOKIES_PATH = "/path/to/cookies.txt"
+DOWNLOAD_PATH = "/root/streambot/downloads/"
+COOKIES_PATH = "/root/streambot/cookies.txt"
 MAX_TELEGRAM_SIZE = 2 * 1024 * 1024 * 1024  # 2 GB
 
 # Crear cliente del bot
