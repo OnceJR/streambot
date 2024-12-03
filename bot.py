@@ -1,113 +1,136 @@
-import os
-from pyrogram import Client, idle, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from pytgcalls import PyTgCalls
-from pytgcalls.types.input_stream import AudioVideoPiped
-from config import Config
+# Importa las bibliotecas necesarias
+from telethon import TelegramClient, events, Button
 import subprocess
-import logging
+import os
+import math
+import ffmpeg
+import json
 
-# Configura el cliente de Pyrogram y PyTgCalls
-client = Client("my_bot", api_id=Config.API_ID, api_hash=Config.API_HASH, bot_token=Config.BOT_TOKEN)
-pytgcalls = PyTgCalls(client)
+# Configuración del bot de Telegram
+API_ID = '24738183'
+API_HASH = '6a1c48cfe81b1fc932a02c4cc1d312bf'
+BOT_TOKEN = '8100674706:AAGzf_JziSNHdJCHHTT4Z9cSWLvF03zF_yU'
 
-# Configuración de logs
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Límites y rutas
+DOWNLOAD_PATH = "/path/to/downloads/"
+COOKIES_PATH = "/path/to/cookies.txt"
+MAX_TELEGRAM_SIZE = 2 * 1024 * 1024 * 1024  # 2 GB
 
-# Función para mostrar botones de control
-def get_control_buttons():
-    buttons = [
-        [
-            InlineKeyboardButton("⏸ Pause", callback_data="pause"),
-            InlineKeyboardButton("▶️ Resume", callback_data="resume"),
-        ],
-        [
-            InlineKeyboardButton("⏹ Stop", callback_data="stop"),
-            InlineKeyboardButton("⏭ Skip", callback_data="skip"),
-        ]
-    ]
-    return InlineKeyboardMarkup(buttons)
+# Crear cliente del bot
+bot = TelegramClient('bot', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
-# Función para reproducir video
-async def play_video(chat_id, url):
+# Función para obtener información del video usando FFprobe
+def get_video_info(file_path):
     try:
-        logger.info(f"Iniciando reproducción para URL: {url}")
-        # Ejecutar ffmpeg como subproceso
-        process = subprocess.Popen(
+        probe = subprocess.run(
+            ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', file_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        return json.loads(probe.stdout)
+    except Exception as e:
+        return {}
+
+# Función para dividir videos que exceden el límite
+def split_video(file_path, max_size):
+    parts = []
+    info = get_video_info(file_path)
+    duration = float(info["format"]["duration"])
+    total_size = os.path.getsize(file_path)
+    num_parts = math.ceil(total_size / max_size)
+    split_duration = duration / num_parts
+
+    for i in range(num_parts):
+        part_name = f"{file_path}_part{i + 1}.mp4"
+        start_time = i * split_duration
+        subprocess.run(
             [
                 "ffmpeg",
-                "-re", "-i", url,
-                "-f", "mpegts",
-                "-codec:v", "mpeg2video",
-                "-codec:a", "mp2",
-                "-r", "30",
-                "pipe:1"
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            bufsize=10**8  # Ajustar tamaño del buffer
+                "-i", file_path,
+                "-ss", str(start_time),
+                "-t", str(split_duration),
+                "-c", "copy",
+                part_name
+            ]
         )
-        # Pasar el flujo de salida a PyTgCalls
-        await pytgcalls.join_group_call(chat_id, AudioVideoPiped(process.stdout))
-        return "Reproduciendo video."
+        parts.append(part_name)
+    return parts
+
+# Evento de inicio
+@bot.on(events.NewMessage(pattern="/start"))
+async def start(event):
+    await event.respond(
+        "👋 ¡Hola! Soy un bot para descargar videos de Twitch. Envía el enlace del video y lo descargaré para ti.",
+        buttons=[Button.inline("Ayuda", b"help")]
+    )
+
+# Evento para manejar enlaces de Twitch
+@bot.on(events.NewMessage(pattern=r"https://www\.twitch\.tv/.*"))
+async def handle_twitch_link(event):
+    url = event.message.text
+    msg = await event.respond("🔄 **Procesando el enlace...**")
+
+    try:
+        # Descargar el video con yt-dlp
+        output_template = os.path.join(DOWNLOAD_PATH, "%(title)s.%(ext)s")
+        subprocess.run(
+            [
+                "yt-dlp",
+                "--cookies", COOKIES_PATH,
+                "-o", output_template,
+                url
+            ],
+            check=True
+        )
+
+        # Buscar el archivo descargado
+        downloaded_file = max(
+            [os.path.join(DOWNLOAD_PATH, f) for f in os.listdir(DOWNLOAD_PATH)],
+            key=os.path.getctime
+        )
+
+        # Obtener información del video y miniatura
+        video_info = get_video_info(downloaded_file)
+        thumbnail = downloaded_file.replace(".mp4", ".jpg")
+        subprocess.run(["ffmpeg", "-i", downloaded_file, "-vf", "thumbnail", "-frames:v", "1", thumbnail])
+
+        # Dividir el video si excede el tamaño permitido
+        if os.path.getsize(downloaded_file) > MAX_TELEGRAM_SIZE:
+            parts = split_video(downloaded_file, MAX_TELEGRAM_SIZE)
+        else:
+            parts = [downloaded_file]
+
+        # Actualizar mensaje y subir el video a Telegram
+        await msg.edit("📤 **Subiendo video(s)...**")
+        for i, part in enumerate(parts, start=1):
+            await bot.send_file(
+                event.chat_id,
+                part,
+                caption=f"🎥 **{video_info['format']['tags'].get('title', 'Video sin título')}**\n📅 {video_info['format']['tags'].get('date', 'Fecha desconocida')}\n⏱️ {round(float(video_info['format']['duration']) / 60, 2)} minutos",
+                thumb=thumbnail,
+                buttons=[Button.inline(f"Parte {i}/{len(parts)}", b"ignore")]
+            )
+        await msg.edit("✅ **Video(s) enviado(s) correctamente.**", buttons=[Button.inline("Ayuda", b"help")])
+
     except Exception as e:
-        logger.error(f"Error en ffmpeg: {e}")
-        return f"Error al reproducir video: {e}"
+        await msg.edit(f"❌ **Error al procesar el enlace:** {str(e)}")
 
-# Comando /play para iniciar la reproducción
-@client.on_message(filters.command("play"))
-async def play(_, message):
-    if len(message.command) < 2:
-        await message.reply_text("Por favor, proporciona un enlace para reproducir.")
-        return
-    url = message.command[1]
-    chat_id = Config.CHAT_IDS[0]  # Usa el primer chat por defecto
-    msg = await play_video(chat_id, url)
-    await message.reply_text(msg, reply_markup=get_control_buttons())
+# Evento para manejar botones
+@bot.on(events.CallbackQuery(data=b"help"))
+async def help(event):
+    await event.edit(
+        "📄 **Instrucciones:**\n"
+        "1. Envía un enlace de Twitch.\n"
+        "2. El bot descargará y optimizará el video.\n"
+        "3. Si el video excede los 2 GB, será dividido en partes.\n"
+        "4. El video se subirá a Telegram.",
+        buttons=[Button.inline("Cerrar", b"close")]
+    )
 
-# Comando /stop para detener la reproducción
-@client.on_message(filters.command("stop"))
-async def stop(_, message):
-    await pytgcalls.leave_group_call(Config.CHAT_IDS[0])
-    await message.reply_text("Reproducción detenida y cola vaciada.", reply_markup=get_control_buttons())
+@bot.on(events.CallbackQuery(data=b"close"))
+async def close(event):
+    await event.delete()
 
-# Manejo de los botones de control
-@client.on_callback_query()
-async def callback_handler(client, callback_query):
-    data = callback_query.data
-    if data == "pause":
-        await pytgcalls.pause_stream(Config.CHAT_IDS[0])
-        await callback_query.answer("Reproducción pausada.")
-    elif data == "resume":
-        await pytgcalls.resume_stream(Config.CHAT_IDS[0])
-        await callback_query.answer("Reproducción reanudada.")
-    elif data == "stop":
-        await pytgcalls.leave_group_call(Config.CHAT_IDS[0])
-        await callback_query.answer("Reproducción detenida.")
-
-# Mensaje de bienvenida
-WELCOME_MESSAGE = """
-🎉 ¡Bienvenido al bot de streaming de video! 🎉
-
-Usa los siguientes comandos para interactuar conmigo:
-- **/play <URL>** - Para reproducir video desde un enlace.
-- **/stop** - Para detener la reproducción y limpiar la cola.
-
-¡Espero que disfrutes del contenido! 📹
-"""
-
-async def send_welcome_message():
-    # Envía el mensaje de bienvenida a todos los chats configurados
-    for chat_id in Config.CHAT_IDS:
-        await client.send_message(chat_id, WELCOME_MESSAGE)
-
-# Función principal para iniciar el cliente y enviar el mensaje de bienvenida
-async def main():
-    await client.start()
-    await pytgcalls.start()
-    await send_welcome_message()
-    await idle()  # Mantiene el bot en ejecución
-
-# Ejecuta el bot
-client.run(main())
+# Iniciar el bot
+print("Bot iniciado...")
+bot.run_until_disconnected()
